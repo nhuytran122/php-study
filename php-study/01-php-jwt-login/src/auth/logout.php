@@ -5,7 +5,6 @@
     $client = new Google_Client();
     $client->setAuthConfig('../../config/credentials.json');
     $client->revokeToken(); 
-
     setcookie("token", "", time() - TOKEN_EXPIRY, "/", "", true, true);
 
     header("Location: ../../view/login.php");

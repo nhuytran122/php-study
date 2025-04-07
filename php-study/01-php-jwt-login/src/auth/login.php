@@ -1,6 +1,7 @@
 <?php
     require_once(__DIR__ . '/../../config/database.php');
     require_once(__DIR__ . '/jwt.php');
+    require_once(__DIR__ . '../../repository/UserRepository.php');
 
     $email = $password = '';
     $error_email = $error_password = '';
@@ -21,28 +22,16 @@
         }
 
         if (empty($error_email) && empty($error_password)) {
-            $sql = "SELECT * FROM users WHERE email = :email";
-            if ($connection != null) {
-                try {
-                    /** @var PDO|null $connection */
-                    $statement = $connection->prepare($sql);
-                    $statement->execute(['email' => $email]);
-
-                    $user = $statement->fetch(PDO::FETCH_ASSOC);
-
-                    if ($user && password_verify($password, $user['password'])) {
-                        createJWT($user['id'], $user['full_name'], $user['role']);
-                        header('location:./index.php');
-                        exit(); 
-                    } else {
-                        $failed_login = true;
-                    }
-                } catch (PDOException $e) {
-                    echo "Database error: " . $e->getMessage();
-                }
+            $userRepository = new UserRepository($connection);
+            $user = $userRepository->findByEmail($email);
+            if ($user && password_verify($password, $user['password'])) {
+                createJWT($user['id'], $user['full_name'], $user['role']);
+                header('location:./index.php');
+                exit(); 
             } else {
-                echo "No database connection.";
+                $failed_login = true;
             }
         }
-    }
+    } 
+    
 ?>

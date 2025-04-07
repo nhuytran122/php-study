@@ -1,9 +1,9 @@
 <?php
     require_once('../config/database.php');
-    require_once('../config/config.php');
     require_once('../src/auth/jwt.php');
     require_once('../src/auth/login.php');
     require_once '../src/auth/verify.php'; 
+    require_once __DIR__ . '/../src/helper/GoogleClientHelper.php';
 
     $user = getUserFromToken();
     if ($user !== false) {
@@ -16,11 +16,7 @@
     if (!file_exists($credentialsPath)) {
         die('File credentials.json không tồn tại tại: ' . $credentialsPath);
     }
-    $client = new Google_Client();
-    $client->setAuthConfig($credentialsPath); 
-    $client->setRedirectUri(URL_GG_CALLBACK);
-    $client->addScope('email');
-    $client->addScope('profile');
+    $client = GoogleClientHelper::createClient();
     $authUrl = $client->createAuthUrl();
 ?>
 <!DOCTYPE html>
