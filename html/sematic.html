@@ -1,0 +1,61 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <header>
+      <h1>Homestay ABC</h1>
+    </header>
+    <main>
+      <article>
+        <h2>Bài viết mới nhất</h2>
+        <p>Nội dung bài viết...</p>
+      </article>
+
+      <details open>
+        <summary>Điều khoản sử dụng</summary>
+        <p>
+          Bạn đồng ý với các điều khoản sử dụng khi tiếp tục sử dụng dịch vụ...
+        </p>
+      </details>
+
+      <dialog id="myDialog">
+        <p>Bạn có chắc muốn xóa không?</p>
+        <button onclick="document.getElementById('myDialog').close()">
+          Hủy
+        </button>
+      </dialog>
+
+      <button onclick="document.getElementById('myDialog').showModal()">
+        Mở Hộp Thoại
+      </button>
+
+      <template id="myTemplate">
+        <div>
+          <h3>Tiêu đề mẫu</h3>
+          <p>Nội dung mẫu...</p>
+        </div>
+      </template>
+
+      <my-element>
+        <slot name="title">Tiêu đề mặc định</slot>
+      </my-element>
+
+      <form oninput="result.value=parseInt(a.value)+parseInt(b.value)">
+        <input type="number" name="a" value="0" /> +
+        <input type="number" name="b" value="0" /> =
+        <output name="result">0</output>
+      </form>
+    </main>
+    <footer>
+      <p>&copy; 2025 Homestay ABC. All rights reserved.</p>
+    </footer>
+  </body>
+  <script>
+    const template = document.getElementById("myTemplate");
+    const clone = template.content.cloneNode(true);
+    document.body.appendChild(clone);
+  </script>
+</html>
