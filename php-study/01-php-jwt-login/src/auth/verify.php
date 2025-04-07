@@ -6,4 +6,12 @@
         $token = $_COOKIE['token'] ?? '';
         return verifyJWT($token);
     }
+
+    function checkPermission($requiredRole) {
+        $user = getUserFromToken();
+        if ($user && $user['role'] === $requiredRole) {
+            return true;
+        }
+        return false;
+    }
 ?>

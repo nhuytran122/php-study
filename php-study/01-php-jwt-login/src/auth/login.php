@@ -2,7 +2,7 @@
     require_once(__DIR__ . '/../../config/database.php');
     require_once(__DIR__ . '/jwt.php');
 
-    $user_name = $password = '';
+    $email = $password = '';
     $error_email = $error_password = '';
     $failed_login = false;
     $token = '';
@@ -11,7 +11,7 @@
         if (empty($_POST['email'])) {
             $error_email = 'Email is required';
         } else {
-            $user_name = htmlspecialchars($_POST['email']);
+            $email = htmlspecialchars($_POST['email']);
         }
 
         if (empty($_POST['password'])) {
@@ -26,17 +26,16 @@
                 try {
                     /** @var PDO|null $connection */
                     $statement = $connection->prepare($sql);
-                    $statement->execute(['email' => $user_name]);
+                    $statement->execute(['email' => $email]);
 
                     $user = $statement->fetch(PDO::FETCH_ASSOC);
 
                     if ($user && password_verify($password, $user['password'])) {
-                        createJWT($user['id'], $user['full_name'], 'USER');
-                        header('location:../../view/index.php');
+                        createJWT($user['id'], $user['full_name'], $user['role']);
+                        header('location:./index.php');
                         exit(); 
                     } else {
                         $failed_login = true;
-                        header('location:../../view/login.php');
                     }
                 } catch (PDOException $e) {
                     echo "Database error: " . $e->getMessage();

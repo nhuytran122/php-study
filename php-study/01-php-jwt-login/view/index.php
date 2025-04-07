@@ -21,10 +21,19 @@
                 }
             ?>
             <?php 
-        if ($user !== false) {
-            echo '<a href="../src/auth/logout.php" class="btn btn-danger">Logout</a>';
-        }
-        ?>
+                if ($user !== false) {
+                    if (checkPermission('ADMIN')) {
+                        echo '<p>You are an ADMIN. You can manage the system.</p>';
+                        echo '<a href="#">Manage Users</a><br>';
+                    } else {
+                        echo '<p>You are a USER. You can view content.</p>';
+                        echo '<a href="#">View Content</a><br>';
+                    }
+                    echo '<a href="../src/auth/logout.php">Logout</a>';
+                } else {
+                    echo '<a href="../view/login.php">Login</a>';
+                }
+            ?>
         </b>
     </h1>
 </body>

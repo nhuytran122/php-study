@@ -1,49 +1,27 @@
 <?php
-require_once('../config/database.php');
-require_once('../src/auth/jwt.php');
+    require_once('../config/database.php');
+    require_once('../config/config.php');
+    require_once('../src/auth/jwt.php');
+    require_once('../src/auth/login.php');
+    require_once '../src/auth/verify.php'; 
 
-$user_name = $password = '';
-$error_email = $error_password = '';
-$failed_login = false;
-
-if (isset($_POST['login'])) {
-    if (empty($_POST['email'])) {
-        $error_email = 'Email is required';
-    } else {
-        $user_name = htmlspecialchars($_POST['email']);
+    $user = getUserFromToken();
+    if ($user !== false) {
+        header('Location: ./index.php');
     }
 
-    if (empty($_POST['password'])) {
-        $error_password = 'Password is required';
-    } else {
-        $password = htmlspecialchars($_POST['password']);
+    // use Google\Client;
+    $credentialsPath = '../config/credentials.json';
+
+    if (!file_exists($credentialsPath)) {
+        die('File credentials.json không tồn tại tại: ' . $credentialsPath);
     }
-
-    if (empty($error_email) && empty($error_password)) {
-        $sql = "SELECT * FROM users WHERE email = :email";
-        if ($connection != null) {
-            try {
-                /** @var PDO|null $connection */
-                $statement = $connection->prepare($sql);
-                $statement->execute(['email' => $user_name]);
-
-                $user = $statement->fetch(PDO::FETCH_ASSOC);
-
-                if ($user && password_verify($password, $user['password'])) {
-                    createJWT($user['id'], $user['full_name'], 'USER');
-                    header('location:index.php');
-                    exit(); 
-                } else {
-                    $failed_login = true;
-                }
-            } catch (PDOException $e) {
-                echo "Database error: " . $e->getMessage();
-            }
-        } else {
-            echo "No database connection.";
-        }
-    }
-}
+    $client = new Google_Client();
+    $client->setAuthConfig($credentialsPath); 
+    $client->setRedirectUri(URL_GG_CALLBACK);
+    $client->addScope('email');
+    $client->addScope('profile');
+    $authUrl = $client->createAuthUrl();
 ?>
 <!DOCTYPE html>
 <html>
@@ -61,7 +39,7 @@ if (isset($_POST['login'])) {
     <form action="" method="POST">
         <div class="mb-3">
             <input type="email" class="form-control <?php echo $error_email ? 'is-invalid' : ''; ?>" name="email"
-                placeholder="Enter your email ?" value="<?php echo htmlspecialchars($user_name); ?>">
+                placeholder="Enter your email ?" value="<?php echo htmlspecialchars($email); ?>">
             <p class="text-danger">
                 <?php echo $error_email; ?>
             </p>
@@ -82,6 +60,7 @@ if (isset($_POST['login'])) {
             <input type="submit" class="btn btn-primary" name="login" value="login">
         </div>
     </form>
+    <a href="<?php echo htmlspecialchars($authUrl); ?>">Login with Google</a>
 </body>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous">
