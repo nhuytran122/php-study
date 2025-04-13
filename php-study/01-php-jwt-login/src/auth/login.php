@@ -25,8 +25,9 @@
             $userRepository = new UserRepository($connection);
             $user = $userRepository->findByEmail($email);
             if ($user && password_verify($password, $user['password'])) {
-                createJWT($user['id'], $user['full_name'], $user['role']);
-                header('location:./index.php');
+                $token = createJWT($user['id'], $user['full_name'], $user['role']);
+                echo json_encode(['token' => $token]);
+                // header('location:./index.php');
                 exit(); 
             } else {
                 $failed_login = true;

@@ -20,6 +20,7 @@ function createJWT($userId, $username, $role) {
     
     $token = JWT::encode($payload, JWT_SECRET, JWT_ALGORITHM);
     setcookie("token", $token, time() + 3600, "/", "", true, true);
+    return $token;
 }
 
 function verifyJWT($token) {
