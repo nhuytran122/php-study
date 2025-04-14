@@ -22,15 +22,16 @@ class AuthController extends Controller
         ]);
 
         $token = Auth::login($user);
-        return response()->json([
-            'status' => 'success',
-            'message' => 'User created successfully',
-            'user' => $user,
-            'authorization' => [
-                'token' => $token,
-                'type' => 'bearer',
-            ]
-        ]);
+        return $this->respondWithToken($token);
+        //  response()->json([
+        //     'status' => 'success',
+        //     'message' => 'User created successfully',
+        //     'user' => $user,
+        //     'authorization' => [
+        //         'token' => $token,
+        //         'type' => 'bearer',
+        //     ]
+        // ]);
     }
 
     public function login(Request $request){
@@ -49,14 +50,15 @@ class AuthController extends Controller
             ], 401);
         }
         $user = Auth::user();
-        return response()->json([
-            'status' => 'success',
-            'user' => $user,
-            'authorization' => [
-                'token' => $token,
-                'type' => 'bearer',
-            ]
-        ]);
+        // return response()->json([
+        //     'status' => 'success',
+        //     'user' => $user,
+        //     'authorization' => [
+        //         'token' => $token,
+        //         'type' => 'bearer',
+        //     ]
+        // ]);
+        return $this->respondWithToken($token);
     }
 
     public function logout(){
@@ -68,13 +70,28 @@ class AuthController extends Controller
     }
 
     public function refresh(){
+        // return response()->json([
+        //     'status' => 'success',
+        //     'user' => Auth::user(),
+        //     'authorization' => [
+        //         'token' => Auth::refresh(),
+        //         'type' => 'bearer',
+        //     ]
+        // ]);
+        $refresh_token = Auth::refresh();
+        return $this->respondWithToken($refresh_token);
+    }
+
+    public function profile(){
+        return response()->json(Auth::user());
+    }
+
+    protected function respondWithToken($token)
+    {
         return response()->json([
-            'status' => 'success',
-            'user' => Auth::user(),
-            'authorization' => [
-                'token' => Auth::refresh(),
-                'type' => 'bearer',
-            ]
+            'access_token' => $token,
+            'token_type' => 'bearer',
+            'expires_in' => Auth::factory()->getTTL() * 60
         ]);
     }
 }

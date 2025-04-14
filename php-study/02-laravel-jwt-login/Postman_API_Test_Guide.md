@@ -87,9 +87,9 @@ pm.test("Save auth token", function () {
     ) {
         try {
             var jsonData = pm.response.json();
-            if (jsonData.authorization && jsonData.authorization.token) {
-                pm.environment.set("auth_token", jsonData.authorization.token);
-                console.log("Token saved from response.");
+            if (jsonData.access_token) {
+                pm.environment.set("auth_token", jsonData.access_token);
+                console.log("Token saved from collection-level test.");
             }
         } catch (e) {
             console.warn("Can not parse JSON:", e);
