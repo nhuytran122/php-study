@@ -16,7 +16,7 @@ class AuthController extends Controller
             'password' => 'required|string|min:6',
         ]);
         $user = User::create([
-            'full_name' => $request->name,
+            'name' => $request->name,
             'email'=> $request->email,
             'password' => Hash::make($request->password)
         ]);
@@ -83,7 +83,9 @@ class AuthController extends Controller
     }
 
     public function profile(){
-        return response()->json(Auth::user());
+        return response()->json([
+            'infor' =>  Auth::user(),
+            'roles' => Auth::user()->roles->pluck('name')->implode(', ')]);
     }
 
     protected function respondWithToken($token)

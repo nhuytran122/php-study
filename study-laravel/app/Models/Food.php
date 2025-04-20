@@ -16,7 +16,7 @@ class Food extends Model
     public $timestamps = true;
     // protected $dateFormat = 'h:m:s';
 
-    protected $fillable = ['name', 'description', 'count', 'category_id'];
+    protected $fillable = ['name', 'description', 'count', 'image_path', 'category_id'];
     
     public function category(){
         return $this->belongsTo(Category::class);
