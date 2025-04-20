@@ -18,11 +18,11 @@ class AdminMiddleware
     {
         if(Auth::check()){
             $user = Auth::user();
-            if($user->hasRole(['admin',  'manager', 'employee'])){
+            if($user->hasAnyRole(['admin',  'manager', 'employee'])){
                 return $next($request);
             }
-            abort(403);
+            return response()->json(['message' => 'Forbidden'], 403);
         }
-        abort(401);
+        return response()->json(['message' => 'Unauthorized'], 401);
     }
 }

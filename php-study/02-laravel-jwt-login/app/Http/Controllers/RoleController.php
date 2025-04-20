@@ -35,7 +35,8 @@ class RoleController extends Controller implements HasMiddleware
     {
         $request->validate([
             'name' => 'required|string',
-            'permissions' => 'required|array'
+            'permissions' => 'array',
+            'permissions.*' => 'exists:permissions,name',
         ]);
         $newRole = Role::create([
             'name' => $request->name
@@ -73,7 +74,8 @@ class RoleController extends Controller implements HasMiddleware
     {
         $request->validate([
             'name' => 'required|string',
-            'permissions' => 'required|array'
+            'permissions' => 'array',
+            'permissions.*' => 'exists:permissions,name',
         ]);
         $role = Role::find($id);
         $role->name = $request->name;

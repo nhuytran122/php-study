@@ -14,11 +14,13 @@ class UserController extends Controller implements HasMiddleware
 {
     public static function middleware(): array{
         return [
-            new Middleware('role:admin|manager|employee'),
-            new Middleware('permission:view-user', only: ['index', 'show']),
-            new Middleware('permission:create-user', only: ['create', 'store']),
-            new Middleware('permission:edit-user', only: ['edit', 'update']),
-            new Middleware('permission:delete-user', only: ['destroy']),
+            // new Middleware('role:admin|manager|employee'),
+            // new Middleware('permission:view-user', only: ['index', 'show']),
+            // new Middleware('permission:create-user', only: ['create', 'store']),
+            // new Middleware('permission:edit-user', only: ['edit', 'update']),
+            // new Middleware('permission:delete-user', only: ['destroy']),
+            new Middleware('role:admin|manager|employee', only: ['index', 'show']),
+            new Middleware('role:admin|manager', except: ['index', 'show']),
         ];
     } 
     
@@ -39,7 +41,8 @@ class UserController extends Controller implements HasMiddleware
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'roles' => 'required|array'
+            'roles' => 'array',
+            'roles.*' => 'exists:roles,name',
             
         ]);
         $newUser = User::create([
@@ -78,7 +81,8 @@ class UserController extends Controller implements HasMiddleware
             'name' => 'required|string|max:255',
             // 'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
             // 'email' => 'required|email|unique:users,email,'.$id.',id'
-            'roles' => 'required|array'
+            'roles' => 'array',
+            'roles.*' => 'exists:roles,name',
         ]);
         
         if (!$user) {

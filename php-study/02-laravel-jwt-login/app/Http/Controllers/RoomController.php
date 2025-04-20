@@ -9,13 +9,11 @@ use Illuminate\Routing\Controllers\Middleware;
 
 class RoomController extends Controller implements HasMiddleware
 {
-    public static function middleware(): array{
+    public static function middleware(): array
+    {
         return [
-            new Middleware('role:admin|manager|employee'),
-            new Middleware('permission:view-room', only: ['index', 'show']),
-            new Middleware('permission:create-room', only: ['create', 'store']),
-            new Middleware('permission:edit-room', only: ['edit', 'update']),
-            new Middleware('permission:delete-room', only: ['destroy']),
+            new Middleware('role:admin|manager|employee', only: ['index', 'show']),
+            new Middleware('role:admin|manager', except: ['index', 'show']),
         ];
     }
     
