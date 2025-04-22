@@ -14,19 +14,19 @@ return new class extends Migration
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
             $table->string('full_name');
-            $table->boolean('gender');
-            $table->dateTime('date_of_birth');
+            $table->enum('gender', ['male', 'female', 'other']);
+            $table->date('date_of_birth');
             $table->string('phone');
             $table->string('address');
             $table->date('hire_date');
-            $table->string('avatar');
-            $table->string('cv');
-            $table->string('contract');
-            $table->boolean('status');
+            $table->string('avatar')->nullable();
+            $table->string('cv')->nullable();
+            $table->string('contract')->nullable();
+            $table->boolean('is_working')->default(true);
             $table->timestamps();
-            $table->foreignId('user_id')->nullable()->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('department_id')->references('id')->on('departments')->onDelete('cascade');
-            $table->foreignId('position_id')->references('id')->on('positions')->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->references('id')->on('users')->onDelete('set null');
+            $table->foreignId('department_id')->nullable()->references('id')->on('departments')->onDelete('set null');
+            $table->foreignId('position_id')->nullable()->references('id')->on('positions')->onDelete('set null');
         });
     }
 

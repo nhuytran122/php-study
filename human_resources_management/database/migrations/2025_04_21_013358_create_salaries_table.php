@@ -21,7 +21,7 @@ return new class extends Migration
             $table->decimal('total_salary', 15, 2);
             $table->boolean('is_paid')->default(false);
             $table->boolean('is_locked')->default(false);
-            $table->foreignId('employee_id')->references('id')->on('employees')->onDelete('cascade');
+            $table->foreignId('employee_id')->nullable()->references('id')->on('employees')->onDelete('set null');
             $table->timestamps();
         });
     }

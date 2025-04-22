@@ -14,8 +14,10 @@ return new class extends Migration
         Schema::create('leave_types', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->integer('max_days');
+            $table->text('description')->nullable();
+            $table->integer('max_days')->nullable();
             $table->boolean('is_paid');
+            $table->enum('applicable_gender', ['male', 'female', 'other', 'all'])->default('all');
             $table->timestamps();
         });
     }

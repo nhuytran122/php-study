@@ -2,10 +2,25 @@
 
 namespace App\Models;
 
+use App\Models\Department;
+use Spatie\Activitylog\LogOptions;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Employee extends Model
 {
+    use LogsActivity;
+
+    protected $fillable = ['full_name', 'gender', 'date_of_birth', 'phone', 'address', 
+    'hire_date', 'avatar', 'cv', 'contract', 'is_working', 'user_id', 'department_id', 'position_id'];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+        ->logOnly(['*'])
+        ->useLogName('employee')     
+        ->logOnlyDirty();
+    }
     public function department(){
         return $this->belongsTo(Department::class);
     }
@@ -22,7 +37,11 @@ class Employee extends Model
         return $this->hasMany(Attendance::class);
     }
     public function salaries(){
-        return $this->hasMany(Employee::class);
+        return $this->hasMany(Salary::class);
+    }
+    
+    public function approved_requests() {
+        return $this->hasMany(LeaveRequest::class, 'approved_by');
     }
 
     public function user()
@@ -32,7 +51,7 @@ class Employee extends Model
 
     protected $casts = [
         'date_of_birth' => 'date',
-        'is_active' => 'boolean',
+        'is_working' => 'boolean',
         'hire_date' => 'date',
     ];
     

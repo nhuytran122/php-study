@@ -5,61 +5,81 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use Illuminate\Http\Request;
 
-class DepartmentController extends Controller
-{
-    /**
-     * Display a listing of the resource.
-     */
+class DepartmentController extends Controller {
+    
     public function index()
     {
-        //
+        return response()->json([
+            Department::all()
+        ]);
     }
-
-    /**
-     * Show the form for creating a new resource.
-     */
+    
     public function create()
     {
-        //
+        
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+        $newDepartment = Department::create([
+            'name' => $request->name,
+            'description' => $request->description
+        ]);
+        return response()->json([
+            'message' => 'Department added successfully',
+            'department' => $newDepartment
+        ], 200);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Department $department)
+    public function show(string $id)
     {
-        //
+        $department = Department::find($id);
+        if (!$department) {
+            return response()->json([
+                'message' => 'Department not found!'
+            ], 404);
+        }
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Department $department)
+    public function edit(string $id)
     {
-        //
+        
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Department $department)
+    public function update(Request $request, string $id)
     {
-        //
-    }
+        $request->validate([
+            'name' => 'required|string|max:255'
+        ]);
+        $department = Department::find($id);
+        if (!$department) {
+            return response()->json([
+                'message' => 'Department not found!'
+            ], 404);
+        }
+        $department->update([
+            'name' => $request->input('name')
+        ]);
+        return response()->json([
+            'message' => 'Department updated successfully',
+            'department' => $department
+        ], 200);
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Department $department)
+    }
+    public function destroy(string $id)
     {
-        //
+        $department = Department::find($id);
+        if (!$department) {
+            return response()->json([
+                'message' => 'Department not found!'
+            ], 404);
+        }
+        $department->delete();
+        return response()->json([
+            'message' => 'Department deleted successfully'
+        ], 200);
     }
 }

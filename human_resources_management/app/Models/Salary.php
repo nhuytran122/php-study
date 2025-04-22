@@ -6,19 +6,24 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-class Department extends Model
+class Salary extends Model
 {
-    protected $fillable = ['name'];
+    protected $fillable = ['month', 'year', 'is_paid', 'employee_id'];
     use LogsActivity;
-    public function employees(){
-        return $this->hasMany(Employee::class);
-    }
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-        ->logOnly(['name'])
+        ->logOnly(['*'])
         ->useLogName('department')     
         ->logOnlyDirty();
     }
+    public function employee(){
+        return $this->belongsTo(Employee::class);
+    }
+
+    protected $casts = [
+        'is_paid' => 'boolean',
+        'is_locked' => 'boolean',
+    ];
 }

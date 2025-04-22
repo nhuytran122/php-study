@@ -2,64 +2,221 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\DateHelper;
+use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
+use App\Models\LeaveType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
-class LeaveRequestController extends Controller
-{
-    /**
-     * Display a listing of the resource.
-     */
+class LeaveRequestController extends Controller {
+    
     public function index()
     {
-        //
+        return response()->json([
+            LeaveRequest::all()
+        ]);
     }
-
-    /**
-     * Show the form for creating a new resource.
-     */
+    
     public function create()
     {
-        //
+        
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $this->mergeDateFields($request);
+        $this->validateLeaveRequest($request); 
+        
+        return DB::transaction(function () use ($request) {
+            $user = Auth::user();
+    
+            $result = $this->checkLeaveConstraints($user->employee->id, $request->leave_type_id, $request->start_date, $request->end_date);
+            if (!$result['status']) {
+                return response()->json(['message' => $result['message']], 400);
+            }
+            $newLeaveRequest = LeaveRequest::create([
+                'start_date'    => $request->start_date,
+                'end_date'      => $request->end_date,
+                'reason'        => $request->reason,
+                'leave_type_id' => $request->leave_type_id,
+                'employee_id'   => $user->employee->id,
+            ]);
+    
+            return response()->json([
+                'message'  => 'Leave Request added successfully',
+                'leave_request' => $newLeaveRequest
+            ], 201);
+        });
+    }
+    
+    public function show(string $id)
+    {
+        $leave_request = LeaveRequest::find($id);
+        if (!$leave_request) {
+            return response()->json([
+                'message' => 'Leave Request not found!'
+            ], 404);
+        }
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(LeaveRequest $leaveRequest)
+    public function edit(string $id)
     {
-        //
+        
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(LeaveRequest $leaveRequest)
+    public function update(Request $request, string $id)
     {
-        //
+        $this->mergeDateFields($request);
+        $this->validateLeaveRequest($request);  
+
+        $leave_request = LeaveRequest::find($id);
+        if (!$leave_request) {
+            return response()->json([
+                'message' => 'Leave Request not found!'
+            ], 404);
+        }
+
+        if (in_array($leave_request->status, ['approved', 'rejected'])) {
+            return response()->json([
+                'message' => 'Cannot edit leave request because it has been ' .$leave_request->status,
+            ], 400);
+        }
+
+        $result = $this->checkLeaveConstraints(Auth::user()->employee->id, 
+            $request->leave_type_id, $request->start_date, $request->end_date);
+        if (!$result['status']) {
+            return response()->json(['message' => $result['message']], 400);
+        }
+
+        $leave_requestData = [
+            'start_date'    => $request->start_date,
+            'end_date'      => $request->end_date,
+            'reason'        => $request->reason,
+            'leave_type_id' => $request->leave_type_id,
+        ];
+
+        $leave_request->update($leave_requestData);
+
+        return response()->json([
+            'message' => 'Leave Request updated successfully',
+            'leave_request' => $leave_request
+        ], 200);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, LeaveRequest $leaveRequest)
+    
+    public function destroy(string $id)
     {
-        //
+        $leave_request = LeaveRequest::find($id);
+        if (in_array($leave_request->status, ['approved', 'rejected'])) {
+            return response()->json([
+                'message' => 'Cannot delete leave request because it has been ' .$leave_request->status,
+            ], 400);
+        }
+        $leave_request->delete();
+        return response()->json([
+            'message' => 'Leave Request deleted successfully'
+        ], 200);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(LeaveRequest $leaveRequest)
+    public function approveOrReject(Request $request, string $id)
     {
-        //
+        $request->validate([
+            'status' => 'required|in:approved,rejected'
+        ]);
+
+        return DB::transaction(function () use ($request, $id) {
+            $leave_request = LeaveRequest::find($id);
+            if (!$leave_request) {
+                return response()->json([
+                    'message' => 'Leave Request not found!'
+                ], 404);
+            }
+
+            if ($leave_request->status !== 'pending') {
+                return response()->json([
+                    'message' => 'This leave request has already been ' . $leave_request->status . '.',
+                ], 400);
+            }
+
+            $leave_request->status = $request->status;
+            $leave_request->approve_by = Auth::user()->employee->id;
+            $leave_request->save();
+
+            if ($leave_request->status == 'approved' && !is_null($leave_request->leave_type->max_days) ) {
+                $leave_type = $leave_request->leave_type;
+                $leave_balance = LeaveBalance::where('employee_id', $leave_request->send_by->id)
+                    ->where('leave_type_id', $leave_type->id)
+                    ->where('year', now()->year)
+                    ->first();
+            
+                if ($leave_balance) {
+                    $daysRequested = $this->calculateDays($leave_request->start_date, $leave_request->end_date);
+                    $leave_balance->remaining_days -= $daysRequested;
+                    $leave_balance->save();
+                }
+                else {
+                    return response()->json([
+                        'message' => 'No leave balance found for this employee and leave type.',
+                    ], 404);
+                }
+            }
+
+            return response()->json([
+                'message' => 'Leave request has been ' . $request->status . ' successfully.',
+                'leave_request' => $leave_request,
+            ], 200);
+        });
     }
+
+    private function validateLeaveRequest(Request $request)
+    {
+        $rules = [
+            'reason'         => 'required|string|max:255',
+            'start_date'     => 'required|date|after_or_equal:today',
+            'end_date'      => 'required|date|after_or_equal:start_date',
+            'leave_type_id'   => 'exists:leave_types,id',
+        ];
+
+        $request->validate($rules);
+    }
+
+
+    private function mergeDateFields(Request $request)
+    {
+        $request->merge([
+            'start_date' => DateHelper::toDateFormat($request->start_date),
+            'end_date' => DateHelper::toDateFormat($request->end_date),
+        ]);
+    }
+
+    private function checkLeaveConstraints($employeeId, $leaveTypeId, $start_date, $end_date)
+    {
+        $daysRequested = $this->calculateDays($start_date, $end_date);
+        $leaveType = LeaveType::findOrFail($leaveTypeId);
+
+        if (!is_null($leaveType->max_days) && $daysRequested > $leaveType->max_days) {
+            return ['status' => false, 'message' => 'Requested days exceed the maximum allowed for this leave type.'];
+        }
+
+        $leaveBalance = LeaveBalance::where('employee_id', $employeeId)
+            ->where('leave_type_id', $leaveTypeId)
+            ->where('year', now()->year)
+            ->first();
+
+        if ($leaveBalance && $daysRequested > $leaveBalance->remaining_days) {
+            return ['status' => false, 'message' => 'You do not have enough remaining leave days.'];
+        }
+
+        return ['status' => true, 'daysRequested' => $daysRequested, 'leaveBalance' => $leaveBalance];
+    }
+
+
+    private function calculateDays($start_date, $end_date)
+    {
+        return Carbon::parse($start_date)->diffInDays(Carbon::parse($end_date)) + 1;
+    }
+
 }

@@ -1,6 +1,11 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\LeaveRequestController;
+use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\PositionController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -11,3 +16,11 @@ Route::post('/refresh', [AuthController::class, 'refresh'])
     ->middleware(['auth:api']);
 Route::get('/profile', [AuthController::class, 'profile'])
     ->middleware(['auth:api']);
+
+Route::resource('positions', PositionController::class);
+Route::resource('departments', DepartmentController::class);
+Route::resource('employees', EmployeeController::class);
+Route::resource('leave-types', LeaveTypeController::class);
+Route::resource('leave-requests', LeaveRequestController::class);
+
+Route::post('/leave-requests/{id}/approval', [LeaveRequestController::class, 'approveOrReject']);

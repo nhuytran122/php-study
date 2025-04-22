@@ -59,7 +59,8 @@ class AuthController extends Controller
 
     public function profile(){
         return response()->json([
-            'infor' =>  Auth::user(),
+            'account' =>  Auth::user(),
+            'information' => Auth::user()->employee,
             // 'roles' => Auth::user()->roles->pluck('name')->implode(', ')
         ]);
     }
