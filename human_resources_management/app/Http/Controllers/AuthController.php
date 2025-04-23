@@ -61,7 +61,7 @@ class AuthController extends Controller
         return response()->json([
             'account' =>  Auth::user(),
             'information' => Auth::user()->employee,
-            // 'roles' => Auth::user()->roles->pluck('name')->implode(', ')
+            'roles' => Auth::user()->roles->pluck('name')->implode(', ')
         ]);
     }
 

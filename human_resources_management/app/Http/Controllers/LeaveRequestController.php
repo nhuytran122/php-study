@@ -3,36 +3,122 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\DateHelper;
+use App\Models\Department;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-class LeaveRequestController extends Controller {
-    
+class LeaveRequestController extends Controller implements HasMiddleware
+{
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view-leave-request', only: ['index', 'show']),
+            new Middleware('permission:create-leave-request', only: ['store']),
+            new Middleware('permission:edit-leave-request', only: ['update']),
+            new Middleware('permission:delete-leave-request', only: ['destroy']),
+            new Middleware('permission:handle-leave-request', only: ['approveOrReject']),
+        ];
+    }
+
     public function index()
     {
-        return response()->json([
-            LeaveRequest::all()
-        ]);
+        $user = Auth::user();
+        $employee = $user->employee;
+
+        if (!$employee) {
+            return response()->json([
+                'message' => 'Không tìm thấy thông tin nhân viên.'
+            ], 403);
+        }
+
+        if ($user->hasRole('manager')) {
+            $department = Department::where('manager_id', $employee->id)->first();
+
+            if (!$department) {
+                return response()->json([
+                    'message' => 'Bạn không phải là quản lý của bất kỳ phòng ban nào.'
+                ], 403);
+            }
+            $employeeIds = $department->employees()->pluck('id');
+            $leaveRequests = LeaveRequest::whereIn('employee_id', $employeeIds)->get();
+        } else {
+            if ($user->hasRole('admin') || $user->hasRole('hr')) {
+                $leaveRequests = LeaveRequest::all();
+            } else {
+                $leaveRequests = LeaveRequest::where('employee_id', $user->employee->id)->get();
+            }
+        }
+
+        return response()->json($leaveRequests, 200);
     }
-    
+
+    public function show(string $id)
+    {
+        $user = Auth::user();
+        $employee = $user->employee;
+
+        if (!$employee) {
+            return response()->json([
+                'message' => 'Không tìm thấy thông tin nhân viên.'
+            ], 403);
+        }
+
+        $leaveRequest = LeaveRequest::find($id);
+        if (!$leaveRequest) {
+            return response()->json([
+                'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
+            ], 404);
+        }
+
+        if ($user->hasRole('admin') || $user->hasRole('hr')) {
+            return response()->json($leaveRequest);
+        }
+
+        if ($user->hasRole('manager')) {
+            $department = Department::where('manager_id', $employee->id)->first();
+
+            if (!$department) {
+                return response()->json([
+                    'message' => 'Bạn không phải là quản lý của bất kỳ phòng ban nào.'
+                ], 403);
+            }
+
+            if ($leaveRequest->employee->department_id !== $department->id) {
+                return response()->json([
+                    'message' => 'Bạn không có quyền xem yêu cầu nghỉ phép này.'
+                ], 403);
+            }
+            return response()->json($leaveRequest);
+        }
+
+        if ($leaveRequest->employee_id !== $employee->id) {
+            return response()->json([
+                'message' => 'Bạn không có quyền xem yêu cầu nghỉ phép này.'
+            ], 403);
+        }
+
+        return response()->json($leaveRequest);
+    }
+
     public function create()
     {
-        
     }
 
     public function store(Request $request)
     {
         $this->mergeDateFields($request);
-        $this->validateLeaveRequest($request); 
-        
+        $this->validateLeaveRequest($request);
+
         return DB::transaction(function () use ($request) {
             $user = Auth::user();
-    
+
             $result = $this->checkLeaveConstraints($user->employee->id, $request->leave_type_id, $request->start_date, $request->end_date);
             if (!$result['status']) {
                 return response()->json(['message' => $result['message']], 400);
@@ -44,48 +130,43 @@ class LeaveRequestController extends Controller {
                 'leave_type_id' => $request->leave_type_id,
                 'employee_id'   => $user->employee->id,
             ]);
-    
+
             return response()->json([
-                'message'  => 'Leave Request added successfully',
+                'message'  => 'Yêu cầu nghỉ phép được thêm thành công',
                 'leave_request' => $newLeaveRequest
             ], 201);
         });
     }
-    
-    public function show(string $id)
-    {
-        $leave_request = LeaveRequest::find($id);
-        if (!$leave_request) {
-            return response()->json([
-                'message' => 'Leave Request not found!'
-            ], 404);
-        }
-    }
 
     public function edit(string $id)
     {
-        
     }
 
     public function update(Request $request, string $id)
     {
         $this->mergeDateFields($request);
-        $this->validateLeaveRequest($request);  
+        $this->validateLeaveRequest($request);
 
         $leave_request = LeaveRequest::find($id);
         if (!$leave_request) {
             return response()->json([
-                'message' => 'Leave Request not found!'
+                'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
             ], 404);
+        }
+
+        if($leave_request->employee->id !== Auth::user()->employee->id){
+            return response()->json([
+                'message' => 'Bạn không có quyền chỉnh sửa yêu cầu nghỉ phép không tìm thấy!'
+            ], 403);
         }
 
         if (in_array($leave_request->status, ['approved', 'rejected'])) {
             return response()->json([
-                'message' => 'Cannot edit leave request because it has been ' .$leave_request->status,
+                'message' => 'Không thể chỉnh sửa yêu cầu nghỉ phép vì nó đã được ' . $leave_request->status,
             ], 400);
         }
 
-        $result = $this->checkLeaveConstraints(Auth::user()->employee->id, 
+        $result = $this->checkLeaveConstraints(Auth::user()->employee->id,
             $request->leave_type_id, $request->start_date, $request->end_date);
         if (!$result['status']) {
             return response()->json(['message' => $result['message']], 400);
@@ -101,23 +182,34 @@ class LeaveRequestController extends Controller {
         $leave_request->update($leave_requestData);
 
         return response()->json([
-            'message' => 'Leave Request updated successfully',
+            'message' => 'Yêu cầu nghỉ phép được cập nhật thành công',
             'leave_request' => $leave_request
         ], 200);
     }
 
-    
     public function destroy(string $id)
     {
         $leave_request = LeaveRequest::find($id);
+        if (!$leave_request) {
+            return response()->json([
+                'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
+            ], 404);
+        }
+
+        if($leave_request->employee->id !== Auth::user()->employee->id){
+            return response()->json([
+                'message' => 'Bạn không có quyền xóa yêu cầu nghỉ phép không tìm thấy!'
+            ], 403);
+        }
+
         if (in_array($leave_request->status, ['approved', 'rejected'])) {
             return response()->json([
-                'message' => 'Cannot delete leave request because it has been ' .$leave_request->status,
+                'message' => 'Không thể xóa yêu cầu nghỉ phép vì nó đã được ' . $leave_request->status,
             ], 400);
         }
         $leave_request->delete();
         return response()->json([
-            'message' => 'Leave Request deleted successfully'
+            'message' => 'Yêu cầu nghỉ phép được xóa thành công'
         ], 200);
     }
 
@@ -131,13 +223,13 @@ class LeaveRequestController extends Controller {
             $leave_request = LeaveRequest::find($id);
             if (!$leave_request) {
                 return response()->json([
-                    'message' => 'Leave Request not found!'
+                    'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
                 ], 404);
             }
 
             if ($leave_request->status !== 'pending') {
                 return response()->json([
-                    'message' => 'This leave request has already been ' . $leave_request->status . '.',
+                    'message' => 'Yêu cầu nghỉ phép này đã được ' . $leave_request->status . '.',
                 ], 400);
             }
 
@@ -145,27 +237,26 @@ class LeaveRequestController extends Controller {
             $leave_request->approve_by = Auth::user()->employee->id;
             $leave_request->save();
 
-            if ($leave_request->status == 'approved' && !is_null($leave_request->leave_type->max_days) ) {
+            if ($leave_request->status == 'approved' && !is_null($leave_request->leave_type->max_days)) {
                 $leave_type = $leave_request->leave_type;
-                $leave_balance = LeaveBalance::where('employee_id', $leave_request->send_by->id)
+                $leave_balance = LeaveBalance::where('employee_id', $leave_request->employee_id)
                     ->where('leave_type_id', $leave_type->id)
                     ->where('year', now()->year)
                     ->first();
-            
+
                 if ($leave_balance) {
                     $daysRequested = $this->calculateDays($leave_request->start_date, $leave_request->end_date);
                     $leave_balance->remaining_days -= $daysRequested;
                     $leave_balance->save();
-                }
-                else {
+                } else {
                     return response()->json([
-                        'message' => 'No leave balance found for this employee and leave type.',
+                        'message' => 'Không tìm thấy số dư nghỉ phép cho nhân viên và loại nghỉ phép này.',
                     ], 404);
                 }
             }
 
             return response()->json([
-                'message' => 'Leave request has been ' . $request->status . ' successfully.',
+                'message' => 'Yêu cầu nghỉ phép đã được ' . $request->status . ' thành công.',
                 'leave_request' => $leave_request,
             ], 200);
         });
@@ -176,13 +267,12 @@ class LeaveRequestController extends Controller {
         $rules = [
             'reason'         => 'required|string|max:255',
             'start_date'     => 'required|date|after_or_equal:today',
-            'end_date'      => 'required|date|after_or_equal:start_date',
+            'end_date'       => 'required|date|after_or_equal:start_date',
             'leave_type_id'   => 'exists:leave_types,id',
         ];
 
         $request->validate($rules);
     }
-
 
     private function mergeDateFields(Request $request)
     {
@@ -198,7 +288,7 @@ class LeaveRequestController extends Controller {
         $leaveType = LeaveType::findOrFail($leaveTypeId);
 
         if (!is_null($leaveType->max_days) && $daysRequested > $leaveType->max_days) {
-            return ['status' => false, 'message' => 'Requested days exceed the maximum allowed for this leave type.'];
+            return ['status' => false, 'message' => 'Số ngày yêu cầu vượt quá giới hạn tối đa cho loại nghỉ phép này.'];
         }
 
         $leaveBalance = LeaveBalance::where('employee_id', $employeeId)
@@ -207,16 +297,14 @@ class LeaveRequestController extends Controller {
             ->first();
 
         if ($leaveBalance && $daysRequested > $leaveBalance->remaining_days) {
-            return ['status' => false, 'message' => 'You do not have enough remaining leave days.'];
+            return ['status' => false, 'message' => 'Bạn không có đủ số ngày nghỉ phép còn lại.'];
         }
 
         return ['status' => true, 'daysRequested' => $daysRequested, 'leaveBalance' => $leaveBalance];
     }
 
-
     private function calculateDays($start_date, $end_date)
     {
         return Carbon::parse($start_date)->diffInDays(Carbon::parse($end_date)) + 1;
     }
-
 }

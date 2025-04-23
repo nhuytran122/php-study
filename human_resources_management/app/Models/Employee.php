@@ -44,6 +44,10 @@ class Employee extends Model
         return $this->hasMany(LeaveRequest::class, 'approved_by');
     }
 
+    public function managesDepartment() {
+        return $this->hasOne(Department::class, 'manager_id');
+    }    
+
     public function user()
     {
         return $this->belongsTo(User::class);

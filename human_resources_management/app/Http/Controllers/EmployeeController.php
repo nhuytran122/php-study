@@ -3,15 +3,29 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\DateHelper;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveType;
 use App\Models\User;
 use Hash;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
 
-class EmployeeController extends Controller {
+class EmployeeController extends Controller implements HasMiddleware{
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view-employee', only: ['index', 'show']),
+            new Middleware('permission:create-employee', only: ['store']),
+            new Middleware('permission:edit-employee', only: ['update']),
+            new Middleware('permission:delete-employee', only: ['destroy']),
+        ];
+    }
     
     public function index()
     {
@@ -29,8 +43,20 @@ class EmployeeController extends Controller {
     {
         $this->mergeDateFields($request);
         $this->validateEmployee($request); 
-        
-        return DB::transaction(function () use ($request) {
+        $existingUser = User::where('email', $request->email)->first();
+        if ($existingUser) {
+            return response()->json(['message' => 'Email is already exists.'], 400);
+        }
+        $selectedRoles = Role::whereIn('id', $request->roles)->pluck('name')->toArray();
+        if (in_array('manager', $selectedRoles)) {
+            $existingManager = Department::where('id', $request->department_id)
+                ->whereNotNull('manager_id')
+                ->first();
+            if ($existingManager) {
+                return response()->json(['message' => 'This department already has a manager.'], 400);
+            }
+        }
+        return DB::transaction(function () use ($request, $selectedRoles) {
             $avatarPath = null;
             $cvPath = null;
             $contractPath = null;
@@ -68,6 +94,18 @@ class EmployeeController extends Controller {
                 'user_id'       => $user->id,
             ]);
 
+            $user->assignRole($selectedRoles);
+            $selectedRoles[] = 'employee'; 
+            $user->assignRole(array_unique($selectedRoles)); 
+
+            if (in_array('manager', $selectedRoles)) {
+                $department = $newEmployee->department;
+                if ($department) {
+                    $department->manager_id = $newEmployee->id;
+                    $department->save();
+                }
+            }
+
             $currentYear = now()->year;
             $leaveTypes = LeaveType::whereNotNull('max_days')->get();
 
@@ -92,12 +130,10 @@ class EmployeeController extends Controller {
     
     public function show(string $id)
     {
-        $employee = Employee::find($id);
-        if (!$employee) {
-            return response()->json([
-                'message' => 'Employee not found!'
-            ], 404);
-        }
+        $employee = $this->findEmployeeOrFail($id);
+        return response()->json([
+            'data' => $employee
+        ], 200);
     }
 
     public function edit(string $id)
@@ -115,6 +151,18 @@ class EmployeeController extends Controller {
             return response()->json([
                 'message' => 'Employee not found!'
             ], 404);
+        }
+
+        $selectedRoles = Role::whereIn('id', $request->roles)->pluck('name')->toArray();
+
+        if (in_array('manager', $selectedRoles)) {
+            $existingManager = Department::where('id', $request->department_id)
+                ->whereNotNull('manager_id')
+                ->first();
+
+            if ($existingManager && $existingManager->manager_id !== $employee->id) {
+                return response()->json(['message' => 'This department already has a manager.'], 400);
+            }
         }
 
         $employeeData = [
@@ -140,6 +188,20 @@ class EmployeeController extends Controller {
         if ($request->hasFile('contract')) {
             $contractPath = $this->uploadFile($request->file('contract'), 'contracts', $request->full_name);
             $employee->update(['contract' => $contractPath]);
+        }
+
+        $selectedRoles[] = 'employee';
+        $employee->user->syncRoles(array_unique($selectedRoles));
+
+        $department = $employee->department;
+        if ($department) {
+            if (in_array('manager', $selectedRoles)) {
+                $department->manager_id = $employee->id;
+            } else if ($department->manager_id === $employee->id) {
+                // Nếu trước đó là manager nhưng bị gỡ role
+                $department->manager_id = null;
+            }
+            $department->save();
         }
 
         return response()->json([
@@ -188,6 +250,7 @@ class EmployeeController extends Controller {
             'contract'      => 'file|mimes:pdf,doc,docx|max:5048',
             'position_id'   => 'exists:positions,id',
             'department_id' => 'exists:departments,id',
+            'roles'         => 'required|array|exists:roles,id',
         ];
 
         if ($isUpdate) {
@@ -212,5 +275,16 @@ class EmployeeController extends Controller {
         $fileName = time() . '-' . str_replace(' ', '_', $name) . '.' . $file->extension();
         $file->move(public_path($folder), $fileName);
         return $folder . '/' . $fileName;
+    }
+
+    private function findEmployeeOrFail($id)
+    {
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return response()->json([
+                'message' => 'Employee not found!'
+            ], 404);
+        }
+        return $employee;
     }
 }

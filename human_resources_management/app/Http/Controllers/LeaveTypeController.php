@@ -4,8 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\LeaveType;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class LeaveTypeController extends Controller {
+class LeaveTypeController extends Controller implements HasMiddleware{
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view-leave-type', only: ['index', 'show']),
+            new Middleware('permission:create-leave-type', only: ['store']),
+            new Middleware('permission:edit-leave-type', only: ['update']),
+            new Middleware('permission:delete-leave-type', only: ['destroy']),
+        ];
+    }
     
     public function index()
     {
@@ -40,12 +52,10 @@ class LeaveTypeController extends Controller {
 
     public function show(string $id)
     {
-        $leave_type = LeaveType::find($id);
-        if (!$leave_type) {
-            return response()->json([
-                'message' => 'Leave Type not found!'
-            ], 404);
-        }
+        $leave_type = $this->findLeaveTypeOrFail($id);
+        return response()->json([
+            'data' => $leave_type
+        ], 200);
     }
 
     public function edit(string $id)
@@ -60,12 +70,7 @@ class LeaveTypeController extends Controller {
             'max_days' => 'nullable|numeric',
             'is_paid' => 'required|boolean'
         ]);
-        $leave_type = LeaveType::find($id);
-        if (!$leave_type) {
-            return response()->json([
-                'message' => 'Leave Type not found!'
-            ], 404);
-        }
+        $leave_type = $this->findLeaveTypeOrFail($id);
         $leave_type->update([
             'name' => $request->name,
             'description' => $request->description ?? '',
@@ -80,12 +85,7 @@ class LeaveTypeController extends Controller {
     }
     public function destroy(string $id)
     {
-        $leave_type = LeaveType::find($id);
-        if (!$leave_type) {
-            return response()->json([
-                'message' => 'Leave Type not found!'
-            ], 404);
-        }
+        $leave_type = $this->findLeaveTypeOrFail($id);
 
         $hasRequest = $leave_type->leave_requests()->exists();
 
@@ -98,5 +98,16 @@ class LeaveTypeController extends Controller {
         return response()->json([
             'message' => 'Leave Type deleted successfully'
         ], 200);
+    }
+
+    private function findLeaveTypeOrFail($id)
+    {
+        $leave_type = LeaveType::find($id);
+        if (!$leave_type) {
+            return response()->json([
+                'message' => 'Leave type not found!'
+            ], 404);
+        }
+        return $leave_type;
     }
 }

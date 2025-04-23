@@ -4,62 +4,81 @@ namespace App\Http\Controllers;
 
 use App\Models\SalaryConfig;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class SalaryConfigController extends Controller
+class SalaryConfigController extends Controller implements HasMiddleware
 {
-    /**
-     * Display a listing of the resource.
-     */
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view-salary-config', only: ['index', 'show']),
+            new Middleware('permission:create-salary-config', only: ['store']),
+            new Middleware('permission:edit-salary-config', only: ['update']),
+            new Middleware('permission:delete-salary-config', only: ['destroy']),
+        ];
+    }
+
     public function index()
     {
-        //
+        return response()->json([
+            SalaryConfig::all(),
+        ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $data = $this->validateRequest($request);
+        $salaryConfig = SalaryConfig::create($data);
+        return response()->json([
+            'message' => 'Salary config created successfully',
+            'data' => $salaryConfig
+        ], 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(SalaryConfig $salaryConfig)
+    public function show(string $id)
     {
-        //
+        $config = $this->findConfigOrFail($id);
+        return response()->json([
+            'data' => $config
+        ], 200);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(SalaryConfig $salaryConfig)
+    public function update(Request $request, string $id)
     {
-        //
+        $config = $this->findConfigOrFail($id);
+        
+        $data = $this->validateRequest($request);
+        $config->update($data);
+        return response()->json([
+            'message' => 'Salary config updated successfully',
+            'data' => $config
+        ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, SalaryConfig $salaryConfig)
+    public function destroy(string $id)
     {
-        //
+        $config = $this->findConfigOrFail($id);
+        $config->delete();
+        return response()->json(['message' => 'Salary config deleted successfully']);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(SalaryConfig $salaryConfig)
+    private function validateRequest(Request $request): array
     {
-        //
+        return $request->validate([
+            'base_salary' => 'required|numeric|min:0',
+            'allowance' => 'nullable|numeric|min:0',
+            'position_id' => 'required|exists:positions,id',
+        ]);
     }
+
+    private function findConfigOrFail($id)
+    {
+        $config = SalaryConfig::find($id);
+        if (!$config) {
+            return response()->json(['message' => 'Salary config not found'], 404);
+        }
+        return $config;
+    }
+
 }

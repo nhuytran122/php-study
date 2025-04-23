@@ -6,6 +6,8 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\PositionController;
+use App\Http\Controllers\SalaryConfigController;
+use App\Http\Controllers\SalaryController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -23,4 +25,11 @@ Route::resource('employees', EmployeeController::class);
 Route::resource('leave-types', LeaveTypeController::class);
 Route::resource('leave-requests', LeaveRequestController::class);
 
-Route::post('/leave-requests/{id}/approval', [LeaveRequestController::class, 'approveOrReject']);
+Route::group(['middleware' => ['role:finance|admin']], function () {
+    Route::resource('salaries', SalaryController::class);
+    Route::resource('salary-configs', SalaryConfigController::class);
+});
+
+Route::group(['middleware' => ['role:hr|manager|admin']], function () {
+    Route::post('/leave-requests/{id}/approval', [LeaveRequestController::class, 'approveOrReject']);
+});

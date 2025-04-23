@@ -4,8 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Position;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class PositionController extends Controller {
+class PositionController extends Controller implements HasMiddleware{
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view-position', only: ['index', 'show']),
+            new Middleware('permission:create-position', only: ['store']),
+            new Middleware('permission:edit-position', only: ['update']),
+            new Middleware('permission:delete-position', only: ['destroy']),
+        ];
+    }
     
     public function index()
     {
@@ -36,12 +48,10 @@ class PositionController extends Controller {
 
     public function show(string $id)
     {
-        $position = Position::find($id);
-        if (!$position) {
-            return response()->json([
-                'message' => 'Position not found!'
-            ], 404);
-        }
+        $position = $this->findPositionOrFail($id);
+        return response()->json([
+            'data' => $position
+        ], 200);
     }
 
     public function edit(string $id)
@@ -54,12 +64,7 @@ class PositionController extends Controller {
         $request->validate([
             'name' => 'required|string|max:255'
         ]);
-        $position = Position::find($id);
-        if (!$position) {
-            return response()->json([
-                'message' => 'Position not found!'
-            ], 404);
-        }
+        $position = $this->findPositionOrFail($id);
         $position->update([
             'name' => $request->input('name')
         ]);
@@ -71,15 +76,21 @@ class PositionController extends Controller {
     }
     public function destroy(string $id)
     {
+        $position = $this->findPositionOrFail($id);
+        $position->delete();
+        return response()->json([
+            'message' => 'Position deleted successfully'
+        ], 200);
+    }
+
+    private function findPositionOrFail($id)
+    {
         $position = Position::find($id);
         if (!$position) {
             return response()->json([
                 'message' => 'Position not found!'
             ], 404);
         }
-        $position->delete();
-        return response()->json([
-            'message' => 'Position deleted successfully'
-        ], 200);
+        return $position;
     }
 }

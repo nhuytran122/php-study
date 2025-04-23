@@ -4,9 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class DepartmentController extends Controller {
-    
+class DepartmentController extends Controller implements HasMiddleware{
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view-department', only: ['index', 'show']),
+            new Middleware('permission:create-department', only: ['store']),
+            new Middleware('permission:edit-department', only: ['update']),
+            new Middleware('permission:delete-department', only: ['destroy']),
+        ];
+    }
     public function index()
     {
         return response()->json([
@@ -36,12 +46,7 @@ class DepartmentController extends Controller {
 
     public function show(string $id)
     {
-        $department = Department::find($id);
-        if (!$department) {
-            return response()->json([
-                'message' => 'Department not found!'
-            ], 404);
-        }
+        $department = $this->findDepartmentOrFail($id);
     }
 
     public function edit(string $id)
@@ -54,12 +59,7 @@ class DepartmentController extends Controller {
         $request->validate([
             'name' => 'required|string|max:255'
         ]);
-        $department = Department::find($id);
-        if (!$department) {
-            return response()->json([
-                'message' => 'Department not found!'
-            ], 404);
-        }
+        $department = $this->findDepartmentOrFail($id);
         $department->update([
             'name' => $request->input('name')
         ]);
@@ -71,15 +71,21 @@ class DepartmentController extends Controller {
     }
     public function destroy(string $id)
     {
+        $department = $this->findDepartmentOrFail($id);
+        $department->delete();
+        return response()->json([
+            'message' => 'Department deleted successfully'
+        ], 200);
+    }
+
+    private function findDepartmentOrFail($id)
+    {
         $department = Department::find($id);
         if (!$department) {
             return response()->json([
                 'message' => 'Department not found!'
             ], 404);
         }
-        $department->delete();
-        return response()->json([
-            'message' => 'Department deleted successfully'
-        ], 200);
+        return $department;
     }
 }
