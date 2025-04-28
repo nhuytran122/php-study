@@ -15,12 +15,12 @@ return new class extends Migration
             $table->id();
             $table->date('start_date');
             $table->date('end_date');
-            $table->string('reason');
+            $table->string('reason')->nullable();
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
 
             $table->foreignId('employee_id')->references('id')->on('employees')->onDelete('cascade');
             $table->foreignId('leave_type_id')->nullable()->references('id')->on('leave_types')->onDelete('set null');
-            $table->foreignId('approve_by')->nullable()->references('id')->on('employees')->onDelete('set null');
+            $table->foreignId('approved_by')->nullable()->references('id')->on('employees')->onDelete('set null');
             $table->timestamps();
         });
     }

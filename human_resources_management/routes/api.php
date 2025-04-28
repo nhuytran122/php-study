@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
@@ -20,6 +21,8 @@ Route::post('/refresh', [AuthController::class, 'refresh'])
     ->middleware(['auth:api']);
 Route::get('/profile', [AuthController::class, 'profile'])
     ->middleware(['auth:api']);
+Route::post('/change-password', [AuthController::class, 'changePassword'])
+    ->middleware(['auth:api']);
 
 Route::resource('positions', PositionController::class);
 Route::resource('departments', DepartmentController::class);
@@ -34,6 +37,12 @@ Route::group(['middleware' => ['role:finance|admin']], function () {
 
 Route::group(['middleware' => ['role:hr|manager|admin']], function () {
     Route::post('/leave-requests/{id}/approval', [LeaveRequestController::class, 'approveOrReject']);
+    Route::post('/leave-requests/mark-absence', [LeaveRequestController::class, 'markAbsence']);
+});
+
+Route::group(['middleware' => ['role:hr|admin']], function () {
+    Route::get('/attendances', [AttendanceController::class, 'index']);
+    Route::post('/attendances', [AttendanceController::class, 'create']);
 });
 
 Route::get("/test-email", function(){

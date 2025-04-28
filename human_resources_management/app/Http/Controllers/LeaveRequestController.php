@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Helpers\DateHelper;
 use App\Mail\LeaveRequestApproved;
 use App\Models\Department;
+use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
@@ -26,6 +27,7 @@ class LeaveRequestController extends Controller implements HasMiddleware
             new Middleware('permission:edit-leave-request', only: ['update']),
             new Middleware('permission:delete-leave-request', only: ['destroy']),
             new Middleware('permission:handle-leave-request', only: ['approveOrReject']),
+            new Middleware('permission:mark-absence', only: ['markAbsence']),
         ];
     }
 
@@ -36,7 +38,7 @@ class LeaveRequestController extends Controller implements HasMiddleware
 
         if (!$employee) {
             return response()->json([
-                'message' => 'Không tìm thấy thông tin nhân viên.'
+                'message' => 'Không tìm thấy thông tin nhân viên của bạn.'
             ], 403);
         }
 
@@ -57,7 +59,6 @@ class LeaveRequestController extends Controller implements HasMiddleware
                 $leaveRequests = LeaveRequest::where('employee_id', $user->employee->id)->get();
             }
         }
-
         return response()->json($leaveRequests, 200);
     }
 
@@ -68,16 +69,10 @@ class LeaveRequestController extends Controller implements HasMiddleware
 
         if (!$employee) {
             return response()->json([
-                'message' => 'Không tìm thấy thông tin nhân viên.'
+                'message' => 'Không tìm thấy thông tin nhân viên của bạn.'
             ], 403);
         }
-
-        $leaveRequest = LeaveRequest::find($id);
-        if (!$leaveRequest) {
-            return response()->json([
-                'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
-            ], 404);
-        }
+        $leaveRequest = $this->findLeaveRequestOrFail($id);
 
         if ($user->hasRole('admin') || $user->hasRole('hr')) {
             return response()->json($leaveRequest);
@@ -149,16 +144,11 @@ class LeaveRequestController extends Controller implements HasMiddleware
         $this->mergeDateFields($request);
         $this->validateLeaveRequest($request);
 
-        $leave_request = LeaveRequest::find($id);
-        if (!$leave_request) {
-            return response()->json([
-                'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
-            ], 404);
-        }
+        $leave_request = $this->findLeaveRequestOrFail($id);
 
         if($leave_request->employee->id !== Auth::user()->employee->id){
             return response()->json([
-                'message' => 'Bạn không có quyền chỉnh sửa yêu cầu nghỉ phép không tìm thấy!'
+                'message' => 'Bạn không có quyền chỉnh sửa yêu cầu nghỉ phép này!'
             ], 403);
         }
 
@@ -191,12 +181,7 @@ class LeaveRequestController extends Controller implements HasMiddleware
 
     public function destroy(string $id)
     {
-        $leave_request = LeaveRequest::find($id);
-        if (!$leave_request) {
-            return response()->json([
-                'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
-            ], 404);
-        }
+        $leave_request = $this->findLeaveRequestOrFail($id);
 
         if($leave_request->employee->id !== Auth::user()->employee->id){
             return response()->json([
@@ -222,12 +207,7 @@ class LeaveRequestController extends Controller implements HasMiddleware
         ]);
 
         return DB::transaction(function () use ($request, $id) {
-            $leave_request = LeaveRequest::find($id);
-            if (!$leave_request) {
-                return response()->json([
-                    'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
-                ], 404);
-            }
+            $leave_request = $this->findLeaveRequestOrFail($id);
 
             if ($leave_request->status !== 'pending') {
                 return response()->json([
@@ -236,7 +216,7 @@ class LeaveRequestController extends Controller implements HasMiddleware
             }
 
             $leave_request->status = $request->status;
-            $leave_request->approve_by = Auth::user()->employee->id;
+            $leave_request->approved_by = Auth::user()->employee->id;
             $leave_request->save();
 
             if ($leave_request->status == 'approved' && !is_null($leave_request->leave_type->max_days)) {
@@ -250,7 +230,8 @@ class LeaveRequestController extends Controller implements HasMiddleware
                     $daysRequested = $this->calculateDays($leave_request->start_date, $leave_request->end_date);
                     $leave_balance->remaining_days -= $daysRequested;
                     $leave_balance->save();
-                    Mail::to($leave_request->send_by->user->email)->send(new LeaveRequestApproved($leave_request));
+                    // Tạm bỏ qua
+                    // Mail::to($leave_request->send_by->user->email)->send(new LeaveRequestApproved($leave_request));
                 } else {
                     return response()->json([
                         'message' => 'Không tìm thấy số dư nghỉ phép cho nhân viên và loại nghỉ phép này.',
@@ -268,7 +249,7 @@ class LeaveRequestController extends Controller implements HasMiddleware
     private function validateLeaveRequest(Request $request)
     {
         $rules = [
-            'reason'         => 'required|string|max:255',
+            'reason'         => 'nullable|string|max:255',
             'start_date'     => 'required|date|after_or_equal:today',
             'end_date'       => 'required|date|after_or_equal:start_date',
             'leave_type_id'   => 'exists:leave_types,id',
@@ -310,4 +291,67 @@ class LeaveRequestController extends Controller implements HasMiddleware
     {
         return Carbon::parse($start_date)->diffInDays(Carbon::parse($end_date)) + 1;
     }
+    
+    public function markAbsence(Request $request)
+    {
+        $user = Auth::user();
+        $employee = $user->employee;
+
+        if ($user->hasRole('manager')) {
+            $department = Department::where('manager_id', $employee->id)->first();
+            if (!$department) {
+                return response()->json(['message' => 'Bạn không phải là quản lý của phòng ban nào.'], 403);
+            }
+
+            $targetEmployee = Employee::find($request->employee_id);
+            if (!$targetEmployee || $targetEmployee->department_id !== $department->id) {
+                return response()->json(['message' => 'Bạn không có quyền đánh dấu vắng mặt cho nhân viên này.'], 403);
+            }
+        }
+        $this->mergeDateFields($request);
+        $request->validate([
+            'employee_id'   => 'required|exists:employees,id', 
+            'reason'         => 'nullable|string|max:255',
+            'start_date'     => 'required|date|after_or_equal:today',
+            'end_date'       => 'required|date|after_or_equal:start_date',
+            'leave_type_id'  => 'nullable|exists:leave_types,id',
+        ]);
+        return DB::transaction(function () use ($request, $user) {
+            $leave_type_id = isset($request->leave_type_id) ? $request->leave_type_id : 1;
+            $leaveRequest = LeaveRequest::create([
+                'start_date'    => $request->start_date,
+                'end_date'      => $request->end_date,
+                'reason'        => $request->reason ?? 'Vắng mặt không thông báo',
+                'status'        => 'approved', 
+                'employee_id'   => $request->employee_id,
+                'leave_type_id' => $leave_type_id,
+                'approved_by'   => $user->employee->id,
+            ]);
+
+            $leaveBalance = LeaveBalance::where('employee_id', $request->employee_id)
+            ->where('leave_type_id', $leave_type_id)
+            ->where('year', now()->year)
+            ->first();
+            $daysRequested = $this->calculateDays($request->start_date, $request->end_date);
+
+            $leaveBalance->remaining_days -= $daysRequested;
+            $leaveBalance->save();
+            return response()->json([
+                'message'  => 'Vắng mặt của nhân viên đã được đánh dấu thành công.',
+                'leave_request' => $leaveRequest
+            ], 201);
+        });
+    }
+
+    private function findLeaveRequestOrFail($id)
+    {
+        $leave_request = LeaveRequest::find($id);
+        if (!$leave_request) {
+            return response()->json([
+                'message' => 'Yêu cầu nghỉ phép không tìm thấy!'
+            ], 404);
+        }
+        return $leave_request;
+    }
+
 }

@@ -13,13 +13,15 @@ return new class extends Migration
     {
         Schema::create('attendances', function (Blueprint $table) {
             $table->id();
-            $table->date('date');
-            $table->datetime('check_in');
-            $table->datetime('check_out');
-            $table->enum('status', ['present', 'late', 'half_day']);
             $table->foreignId('employee_id')->references('id')->on('employees')->onDelete('cascade');
+            $table->integer('month');
+            $table->integer('year'); 
+            $table->integer('working_days'); 
+            $table->integer('leave_days')->default(0);
+            $table->integer('paid_leave_days')->default(0); 
             $table->timestamps();
         });
+        
     }
 
     /**

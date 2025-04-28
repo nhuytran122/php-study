@@ -40,6 +40,9 @@ class PermissionSeeder extends Seeder
             'view-salary', 'create-payroll', 'edit-payroll', 'delete-payroll',
 
             'view-leave-balance',
+            
+            'create-attendance',
+            'mark-absence'
         ];
 
         foreach ($permissions as $permission) {
@@ -65,10 +68,12 @@ class PermissionSeeder extends Seeder
         $hrPermissions = array_merge($employeePermissions, [
             'create-employee', 'edit-employee', 'delete-employee',
             'handle-leave-request',
+            'create-attendance',
+            'mark-absence'
         ]);
         Role::findByName('hr')->givePermissionTo($hrPermissions);
 
-        $managerPermissions = ['handle-leave-request'];
+        $managerPermissions = ['handle-leave-request', 'mark-absence'];
         Role::findByName('manager')->givePermissionTo($managerPermissions);
 
         $financePermissions = [
