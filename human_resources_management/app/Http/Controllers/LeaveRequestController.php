@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\DateHelper;
+use App\Mail\LeaveRequestApproved;
 use App\Models\Department;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
@@ -13,6 +14,7 @@ use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class LeaveRequestController extends Controller implements HasMiddleware
 {
@@ -248,6 +250,7 @@ class LeaveRequestController extends Controller implements HasMiddleware
                     $daysRequested = $this->calculateDays($leave_request->start_date, $leave_request->end_date);
                     $leave_balance->remaining_days -= $daysRequested;
                     $leave_balance->save();
+                    Mail::to($leave_request->send_by->user->email)->send(new LeaveRequestApproved($leave_request));
                 } else {
                     return response()->json([
                         'message' => 'Không tìm thấy số dư nghỉ phép cho nhân viên và loại nghỉ phép này.',

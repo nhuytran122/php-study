@@ -8,6 +8,8 @@ use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\SalaryConfigController;
 use App\Http\Controllers\SalaryController;
+use App\Mail\MyEmail;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -32,4 +34,9 @@ Route::group(['middleware' => ['role:finance|admin']], function () {
 
 Route::group(['middleware' => ['role:hr|manager|admin']], function () {
     Route::post('/leave-requests/{id}/approval', [LeaveRequestController::class, 'approveOrReject']);
+});
+
+Route::get("/test-email", function(){
+    $name = 'Nhu Y';
+    Mail::to('nhuyvinmini1218@gmail.com')->send(new MyEmail($name));
 });
