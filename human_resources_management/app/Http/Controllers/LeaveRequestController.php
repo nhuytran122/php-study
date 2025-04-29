@@ -231,14 +231,14 @@ class LeaveRequestController extends Controller implements HasMiddleware
                     $daysRequested = $this->calculateDays($leave_request->start_date, $leave_request->end_date);
                     $leave_balance->remaining_days -= $daysRequested;
                     $leave_balance->save();
-                    // Tạm bỏ qua
-                    // Mail::to($leave_request->send_by->user->email)->send(new LeaveRequestApproved($leave_request));
                 } else {
                     return response()->json([
                         'message' => 'Không tìm thấy số dư nghỉ phép cho nhân viên và loại nghỉ phép này.',
                     ], 404);
                 }
             }
+            // Tạm bỏ qua
+            // Mail::to($leave_request->send_by->user->email)->send(new LeaveRequestApproved($leave_request));
             return response()->json([
                 'message' => 'Yêu cầu nghỉ phép đã được ' . $request->status . ' thành công.',
                 'leave_request' => $leave_request,

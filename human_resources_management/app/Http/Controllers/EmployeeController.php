@@ -62,17 +62,17 @@ class EmployeeController extends Controller implements HasMiddleware{
             $cvPath = null;
             $contractPath = null;
 
-            if ($request->hasFile('avatar')) {
-                $avatarPath = $this->uploadFile($request->file('avatar'), 'images', $request->full_name);
-            }
+            // if ($request->hasFile('avatar')) {
+            //     $avatarPath = $this->uploadFile($request->file('avatar'), 'images', $request->full_name);
+            // }
 
-            if ($request->hasFile('cv')) {
-                $cvPath = $this->uploadFile($request->file('cv'), 'cvs', $request->full_name);
-            }
+            // if ($request->hasFile('cv')) {
+            //     $cvPath = $this->uploadFile($request->file('cv'), 'cvs', $request->full_name);
+            // }
 
-            if ($request->hasFile('contract')) {
-                $contractPath = $this->uploadFile($request->file('contract'), 'contracts', $request->full_name);
-            }
+            // if ($request->hasFile('contract')) {
+            //     $contractPath = $this->uploadFile($request->file('contract'), 'contracts', $request->full_name);
+            // }
 
             $user = User::create([
                 'name'     => $request->full_name,
@@ -87,15 +87,17 @@ class EmployeeController extends Controller implements HasMiddleware{
                 'phone'         => $request->phone,
                 'address'       => $request->address,
                 'hire_date'     => $request->hire_date,
-                'avatar'        => $avatarPath,
-                'cv'            => $cvPath,
-                'contract'      => $contractPath,
                 'position_id'   => $request->position_id,
                 'department_id' => $request->department_id,
                 'user_id'       => $user->id,
             ]);
 
-            $user->assignRole($selectedRoles);
+            // $avatarPath = $request->file('avatar');
+            // $newEmployee->addMedia($avatarPath)->toMediaCollection('contracts');
+            $newEmployee->addMediaFromRequest('avatar')->toMediaCollection('avatars');
+            $newEmployee->addMediaFromRequest('cv')->toMediaCollection('cvs');            
+            $newEmployee->addMediaFromRequest('contract')->toMediaCollection('contracts');
+            
             $selectedRoles[] = 'employee'; 
             $user->assignRole(array_unique($selectedRoles)); 
 
@@ -179,16 +181,16 @@ class EmployeeController extends Controller implements HasMiddleware{
 
         $employee->update($employeeData);
         if ($request->hasFile('avatar')) {
-            $avatarPath = $this->uploadFile($request->file('avatar'), 'images', $request->full_name);
-            $employee->update(['avatar' => $avatarPath]);
+            $employee->addMediaFromRequest('avatar')->toMediaCollection('avatars');
+            $employee->clearMediaCollection('avatars');
         }
         if ($request->hasFile('cv')) {
-            $cvPath = $this->uploadFile($request->file('cv'), 'cvs', $request->full_name);
-            $employee->update(['cv' => $cvPath]);
+            $employee->addMediaFromRequest('cv')->toMediaCollection('cvs'); 
+            $employee->clearMediaCollection('cvs');
         }
         if ($request->hasFile('contract')) {
-            $contractPath = $this->uploadFile($request->file('contract'), 'contracts', $request->full_name);
-            $employee->update(['contract' => $contractPath]);
+            $employee->addMediaFromRequest('contract')->toMediaCollection('contracts');
+            $employee->clearMediaCollection('contracts');
         }
 
         $selectedRoles[] = 'employee';
@@ -228,6 +230,7 @@ class EmployeeController extends Controller implements HasMiddleware{
             ], 400);
         }
         $employee->delete();
+        // $employee->clearMediaCollections();
         return response()->json([
             'message' => 'Employee deleted successfully'
         ], 200);

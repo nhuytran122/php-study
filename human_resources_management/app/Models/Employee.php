@@ -6,13 +6,15 @@ use App\Models\Department;
 use Spatie\Activitylog\LogOptions;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Employee extends Model
+class Employee extends Model implements HasMedia
 {
-    use LogsActivity;
+    use LogsActivity, InteractsWithMedia;
 
     protected $fillable = ['full_name', 'gender', 'date_of_birth', 'phone', 'address', 
-    'hire_date', 'avatar', 'cv', 'contract', 'is_working', 'user_id', 'department_id', 'position_id'];
+    'hire_date','is_working', 'user_id', 'department_id', 'position_id'];
 
     public function getActivitylogOptions(): LogOptions
     {

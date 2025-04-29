@@ -18,6 +18,7 @@
         "php-open-source-saver/jwt-auth": "^2.8",
         "railsware/mailtrap-php": "^2.1",
         "spatie/laravel-activitylog": "^4.10",
+        "spatie/laravel-medialibrary": "^11.12",
         "spatie/laravel-permission": "^6.17",
         "symfony/http-client": "^7.2"
     },

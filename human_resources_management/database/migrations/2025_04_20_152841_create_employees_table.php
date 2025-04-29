@@ -19,9 +19,6 @@ return new class extends Migration
             $table->string('phone');
             $table->string('address');
             $table->date('hire_date');
-            $table->string('avatar')->nullable();
-            $table->string('cv')->nullable();
-            $table->string('contract')->nullable();
             $table->boolean('is_working')->default(true);
             $table->timestamps();
             $table->foreignId('user_id')->nullable()->references('id')->on('users')->onDelete('set null');
