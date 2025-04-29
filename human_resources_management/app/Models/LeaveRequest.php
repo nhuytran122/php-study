@@ -14,7 +14,6 @@ class LeaveRequest extends Model
     public function approved_by() {
         return $this->belongsTo(Employee::class, 'approved_by');
     }
-    
 
     public function leave_type(){
         return $this->belongsTo(LeaveType::class);

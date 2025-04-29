@@ -28,7 +28,7 @@ class Employee extends Model
         return $this->belongsTo(Position::class);
     }
     public function leave_requests(){
-        return $this->hasMany(LeaveRequest::class);
+        return $this->hasMany(LeaveRequest::class, 'send_by');
     }
     public function leave_balances(){
         return $this->hasMany(LeaveBalance::class);

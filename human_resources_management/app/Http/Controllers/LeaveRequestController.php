@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\LeaveRequestExport;
 use App\Helpers\DateHelper;
 use App\Mail\LeaveRequestApproved;
 use App\Models\Department;
@@ -238,12 +239,16 @@ class LeaveRequestController extends Controller implements HasMiddleware
                     ], 404);
                 }
             }
-
             return response()->json([
                 'message' => 'Yêu cầu nghỉ phép đã được ' . $request->status . ' thành công.',
                 'leave_request' => $leave_request,
             ], 200);
         });
+    }
+
+    public function export() 
+    {
+        return new LeaveRequestExport(Employee::all());
     }
 
     private function validateLeaveRequest(Request $request)

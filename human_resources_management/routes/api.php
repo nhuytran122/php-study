@@ -1,5 +1,6 @@
 <?php
 
+use App\Exports\EmployeeExport;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DepartmentController;
@@ -24,6 +25,9 @@ Route::get('/profile', [AuthController::class, 'profile'])
 Route::post('/change-password', [AuthController::class, 'changePassword'])
     ->middleware(['auth:api']);
 
+Route::get('/employees/export-employees', [EmployeeController::class, 'export']);
+Route::get('/leave-requests/export-leave-requests', [LeaveRequestController::class, 'export']);
+
 Route::resource('positions', PositionController::class);
 Route::resource('departments', DepartmentController::class);
 Route::resource('employees', EmployeeController::class);
@@ -38,6 +42,9 @@ Route::group(['middleware' => ['role:finance|admin']], function () {
 Route::group(['middleware' => ['role:hr|manager|admin']], function () {
     Route::post('/leave-requests/{id}/approval', [LeaveRequestController::class, 'approveOrReject']);
     Route::post('/leave-requests/mark-absence', [LeaveRequestController::class, 'markAbsence']);
+
+    // Route::get('/employees/export-employees', [EmployeeController::class, 'export']);
+    // Route::get('/leave-requests/export-leave-requests', [LeaveRequestController::class, 'export']);
 });
 
 Route::group(['middleware' => ['role:hr|admin']], function () {

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Attendance;
 use App\Models\Employee;
-use App\Models\LeaveRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -13,10 +12,10 @@ class AttendanceController extends Controller
 {
     public function index(Request $request)
     {
-        
         $attendances = Attendance::where('month', $request->month ?? now()->month())
-                ->where('year', $request->year ?? now()->year())
-                ->get();
+            ->where('year', $request->year ?? now()->year())
+            ->get();
+
         return response()->json([
             'data' => $attendances
         ], 200);
@@ -37,29 +36,35 @@ class AttendanceController extends Controller
                         'message' => 'Chỉ tổng kết ngày công sau khi hết tháng'
                     ], 400);
                 }
-                
-                $workingDaysInMonth = $this->calculateWorkingDaysInMonth($beginOfMonth, $endOfMonth);  
-                $leaveRequests = LeaveRequest::with('leave_type')
-                ->where(function ($query) use ($beginOfMonth, $endOfMonth) {
-                    $query->whereBetween('start_date', [$beginOfMonth, $endOfMonth])
-                        ->orWhereBetween('end_date', [$beginOfMonth, $endOfMonth]);
-                })
-                ->where('status', 'approved')
-                ->get();
 
-                $leaveData = [];
-                foreach ($leaveRequests as $leaveRequest) {
-                    $leaveData[$leaveRequest->employee_id][] = $leaveRequest;
-                }
+                $workingDaysInMonth = $this->calculateWorkingDaysInMonth($beginOfMonth, $endOfMonth);
 
-                Employee::chunk(100, function ($employees) use ($month, $year, $workingDaysInMonth, $leaveData) {
+                // Query sum ngày nghỉ theo nhân viên
+                $leaveSummary = DB::table('leave_requests')
+                    ->join('leave_types', 'leave_requests.leave_type_id', '=', 'leave_types.id')
+                    ->select(
+                        'leave_requests.employee_id',
+                        DB::raw('SUM(CASE WHEN leave_types.is_paid = 0 THEN DATEDIFF(leave_requests.end_date, leave_requests.start_date) + 1 ELSE 0 END) AS unpaid_leave_days'),
+                        DB::raw('SUM(CASE WHEN leave_types.is_paid = 1 THEN DATEDIFF(leave_requests.end_date, leave_requests.start_date) + 1 ELSE 0 END) AS paid_leave_days')
+                    )
+                    ->where('leave_requests.status', 'approved')
+                    ->where(function ($query) use ($beginOfMonth, $endOfMonth) {
+                        $query->whereBetween('leave_requests.start_date', [$beginOfMonth, $endOfMonth])
+                              ->orWhereBetween('leave_requests.end_date', [$beginOfMonth, $endOfMonth]);
+                    })
+                    ->groupBy('leave_requests.employee_id')
+                    ->get()
+                    ->keyBy('employee_id');
+
+                Employee::chunk(100, function ($employees) use ($month, $year, $workingDaysInMonth, $leaveSummary) {
                     foreach ($employees as $employee) {
-                        $this->calculateWorkingDaysForEmployee($employee->id, $month, $year, $workingDaysInMonth, $leaveData);
+                        $this->calculateWorkingDaysForEmployee($employee->id, $month, $year, $workingDaysInMonth, $leaveSummary);
                     }
                 });
+
                 $attendances = Attendance::where('month', $month)
-                                        ->where('year', $year)
-                                        ->get();
+                    ->where('year', $year)
+                    ->get();
 
                 return response()->json([
                     'message' => 'Tổng kết ngày công thành công',
@@ -84,39 +89,28 @@ class AttendanceController extends Controller
         return $workingDaysInMonth;
     }
 
-    protected function calculateWorkingDaysForEmployee($employeeId, $month, $year, $workingDaysInMonth, $leaveData)
+    protected function calculateWorkingDaysForEmployee($employeeId, $month, $year, $workingDaysInMonth, $leaveSummary)
     {
         $existingAttendance = Attendance::where('employee_id', $employeeId)
             ->where('month', $month)
             ->where('year', $year)
-            ->first();  
-            
+            ->first();
+
         if ($existingAttendance) {
-            return; 
+            return;
         }
-        $leaveRequests = isset($leaveData[$employeeId]) ? $leaveData[$employeeId] : [];
 
-        $leaveDaysTaken = 0;
-        $paidLeaveDays = 0;
-
-        for ($i = 0; $i < count($leaveRequests); $i++) {
-            $leaveRequest = $leaveRequests[$i];
-            $days = $leaveRequest->start_date->diffInDays($leaveRequest->end_date) + 1;
-
-            if ($leaveRequest->leave_type && !$leaveRequest->leave_type->is_paid) {
-                $leaveDaysTaken += $days; 
-            } else {
-                $paidLeaveDays += $days; 
-            }
-        }
+        $summary = $leaveSummary->get($employeeId);
+        $unpaidLeaveDays = $summary ? (int) $summary->unpaid_leave_days : 0;
+        $paidLeaveDays = $summary ? (int) $summary->paid_leave_days : 0;
 
         Attendance::create([
             'employee_id' => $employeeId,
             'month' => $month,
             'year' => $year,
-            'working_days' => $workingDaysInMonth - $leaveDaysTaken, 
-            'leave_days' => $leaveDaysTaken, 
-            'paid_leave_days' => $paidLeaveDays, 
+            'working_days' => $workingDaysInMonth - $unpaidLeaveDays,
+            'leave_days' => $unpaidLeaveDays,
+            'paid_leave_days' => $paidLeaveDays,
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\EmployeeExport;
 use App\Helpers\DateHelper;
 use App\Models\Department;
 use App\Models\Employee;
@@ -230,6 +231,11 @@ class EmployeeController extends Controller implements HasMiddleware{
         return response()->json([
             'message' => 'Employee deleted successfully'
         ], 200);
+    }
+
+    public function export() 
+    {
+        return new EmployeeExport();
     }
 
     private function validateEmployee(Request $request, $isUpdate = false)
